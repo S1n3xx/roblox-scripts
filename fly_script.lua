@@ -1,6 +1,7 @@
--- Flight Script with UI and No Clip for Roblox
+-- Flight Script with UI, No Clip, and Block Collector for Roblox
 -- Press E to toggle flight mode
 -- Press X to toggle no clip mode
+-- Press C to bring all unanchored blocks to you
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -26,7 +27,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 -- Main Frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 250, 0, 200)
+mainFrame.Size = UDim2.new(0, 250, 0, 250)
 mainFrame.Position = UDim2.new(0, 20, 0, 20)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -102,6 +103,33 @@ noclipStatusLabel.TextSize = 12
 noclipStatusLabel.Font = Enum.Font.Gotham
 noclipStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 noclipStatusLabel.Parent = mainFrame
+
+-- Block Collector Button
+local collectButton = Instance.new("TextButton")
+collectButton.Name = "CollectButton"
+collectButton.Size = UDim2.new(1, -20, 0, 30)
+collectButton.Position = UDim2.new(0, 10, 0, 155)
+collectButton.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
+collectButton.BorderSizePixel = 0
+collectButton.Text = "Collect Blocks (Press C)"
+collectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+collectButton.TextSize = 12
+collectButton.Font = Enum.Font.Gotham
+collectButton.Parent = mainFrame
+
+-- Block Count Label
+local blockCountLabel = Instance.new("TextLabel")
+blockCountLabel.Name = "BlockCountLabel"
+blockCountLabel.Size = UDim2.new(1, -20, 0, 20)
+blockCountLabel.Position = UDim2.new(0, 10, 0, 195)
+blockCountLabel.BackgroundTransparency = 1
+blockCountLabel.BorderSizePixel = 0
+blockCountLabel.Text = "Blocks: 0"
+blockCountLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+blockCountLabel.TextSize = 11
+blockCountLabel.Font = Enum.Font.Gotham
+blockCountLabel.TextXAlignment = Enum.TextXAlignment.Left
+blockCountLabel.Parent = mainFrame
 
 -- Make slider draggable
 local dragging = false
@@ -259,7 +287,41 @@ local function stopNoclip()
     noclipStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 end
 
--- Listen for E key press (Flight toggle)
+-- Function to collect all unanchored blocks
+local function collectBlocks()
+    local blocksCollected = 0
+    
+    for _, part in pairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and not part.Anchored and part.Parent ~= character then
+            -- Create attachment points if they don't exist
+            if not part:FindFirstChild("BodyVelocity") then
+                local bodyVel = Instance.new("BodyVelocity")
+                bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bodyVel.P = 10000
+                bodyVel.Parent = part
+                
+                -- Move the part to the player
+                local direction = (humanoidRootPart.Position - part.Position).Unit
+                bodyVel.Velocity = direction * 100
+                
+                -- Remove the velocity after a short time to let it settle
+                game:GetService("Debris"):AddItem(bodyVel, 1)
+                
+                blocksCollected = blocksCollected + 1
+            end
+        end
+    end
+    
+    blockCountLabel.Text = "Blocks: " .. blocksCollected
+    print("Collected " .. blocksCollected .. " blocks!")
+end
+
+-- Button click handler
+collectButton.MouseButton1Click:Connect(function()
+    collectBlocks()
+end)
+
+-- Listen for key presses
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
@@ -278,6 +340,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             startNoclip()
         end
     end
+    
+    if input.KeyCode == Enum.KeyCode.C then
+        collectBlocks()
+    end
 end)
 
 -- Handle character respawn
@@ -292,7 +358,8 @@ player.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
-print("Flight script with UI and No Clip loaded!")
+print("Flight script with UI, No Clip, and Block Collector loaded!")
 print("Press E to toggle flight")
 print("Press X to toggle no clip")
+print("Press C to collect all unanchored blocks")
 print("Drag the slider to adjust flight speed (1-200)")
