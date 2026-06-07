@@ -1,7 +1,9 @@
--- Flight Script with UI, No Clip, and Block Collector for Roblox
+-- Flight Script with UI, No Clip, Block Collector, and Cool Features for Roblox
 -- Press E to toggle flight mode
 -- Press X to toggle no clip mode
 -- Press C to bring all unanchored blocks to you
+-- Press F to toggle fly speed boost
+-- Press R to reset position to spawn
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -10,14 +12,17 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local spawnPosition = humanoidRootPart.Position
 
 local isFlying = false
 local isNoclip = false
+local isBoostActive = false
 local flySpeed = 50
 local bodyVelocity
 local bodyGyro
 local noclipConnection
 local collectedParts = {}
+local particles = {}
 
 -- Create UI
 local screenGui = Instance.new("ScreenGui")
@@ -28,7 +33,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 -- Main Frame with gradient background
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 300, 0, 420)
+mainFrame.Size = UDim2.new(0, 300, 0, 500)
 mainFrame.Position = UDim2.new(0, 20, 0, 20)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 mainFrame.BorderSizePixel = 0
@@ -69,7 +74,7 @@ title.Name = "Title"
 title.Size = UDim2.new(1, 0, 1, 0)
 title.BackgroundTransparency = 1
 title.BorderSizePixel = 0
-title.Text = "✈️ FLIGHT HUB"
+title.Text = "✈️ FLIGHT HUB v2"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 18
 title.Font = Enum.Font.GothamBold
@@ -101,7 +106,7 @@ speedLabel.Parent = contentFrame
 -- Speed Value Label
 local speedValueLabel = Instance.new("TextLabel")
 speedValueLabel.Name = "SpeedValueLabel"
-speedLabel.Size = UDim2.new(0, 100, 0, 25)
+speedValueLabel.Size = UDim2.new(0, 100, 0, 25)
 speedValueLabel.Position = UDim2.new(1, -110, 0, 15)
 speedValueLabel.BackgroundTransparency = 1
 speedValueLabel.BorderSizePixel = 0
@@ -151,7 +156,7 @@ buttonCorner.Parent = sliderButton
 -- Status Container
 local statusContainer = Instance.new("Frame")
 statusContainer.Name = "StatusContainer"
-statusContainer.Size = UDim2.new(1, -20, 0, 80)
+statusContainer.Size = UDim2.new(1, -20, 0, 100)
 statusContainer.Position = UDim2.new(0, 10, 0, 70)
 statusContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 statusContainer.BorderSizePixel = 0
@@ -163,13 +168,13 @@ statusCorner.Parent = statusContainer
 -- Flight Status
 local flightStatusLabel = Instance.new("TextLabel")
 flightStatusLabel.Name = "FlightStatusLabel"
-flightStatusLabel.Size = UDim2.new(1, -20, 0, 25)
-flightStatusLabel.Position = UDim2.new(0, 10, 0, 8)
+flightStatusLabel.Size = UDim2.new(1, -20, 0, 20)
+flightStatusLabel.Position = UDim2.new(0, 10, 0, 5)
 flightStatusLabel.BackgroundTransparency = 1
 flightStatusLabel.BorderSizePixel = 0
 flightStatusLabel.Text = "🚁 Flight: OFF"
 flightStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-flightStatusLabel.TextSize = 12
+flightStatusLabel.TextSize = 11
 flightStatusLabel.Font = Enum.Font.Gotham
 flightStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 flightStatusLabel.Parent = statusContainer
@@ -177,27 +182,41 @@ flightStatusLabel.Parent = statusContainer
 -- No Clip Status
 local noclipStatusLabel = Instance.new("TextLabel")
 noclipStatusLabel.Name = "NoclipStatusLabel"
-noclipStatusLabel.Size = UDim2.new(1, -20, 0, 25)
-noclipStatusLabel.Position = UDim2.new(0, 10, 0, 27)
+noclipStatusLabel.Size = UDim2.new(1, -20, 0, 20)
+noclipStatusLabel.Position = UDim2.new(0, 10, 0, 25)
 noclipStatusLabel.BackgroundTransparency = 1
 noclipStatusLabel.BorderSizePixel = 0
 noclipStatusLabel.Text = "👻 No Clip: OFF"
 noclipStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-noclipStatusLabel.TextSize = 12
+noclipStatusLabel.TextSize = 11
 noclipStatusLabel.Font = Enum.Font.Gotham
 noclipStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 noclipStatusLabel.Parent = statusContainer
 
+-- Boost Status
+local boostStatusLabel = Instance.new("TextLabel")
+boostStatusLabel.Name = "BoostStatusLabel"
+boostStatusLabel.Size = UDim2.new(1, -20, 0, 20)
+boostStatusLabel.Position = UDim2.new(0, 10, 0, 45)
+boostStatusLabel.BackgroundTransparency = 1
+boostStatusLabel.BorderSizePixel = 0
+boostStatusLabel.Text = "🔥 Boost: OFF"
+boostStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+boostStatusLabel.TextSize = 11
+boostStatusLabel.Font = Enum.Font.Gotham
+boostStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+boostStatusLabel.Parent = statusContainer
+
 -- Block Count
 local blockCountLabel = Instance.new("TextLabel")
 blockCountLabel.Name = "BlockCountLabel"
-blockCountLabel.Size = UDim2.new(1, -20, 0, 25)
-blockCountLabel.Position = UDim2.new(0, 10, 0, 46)
+blockCountLabel.Size = UDim2.new(1, -20, 0, 20)
+blockCountLabel.Position = UDim2.new(0, 10, 0, 65)
 blockCountLabel.BackgroundTransparency = 1
 blockCountLabel.BorderSizePixel = 0
 blockCountLabel.Text = "📦 Blocks: 0"
 blockCountLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
-blockCountLabel.TextSize = 12
+blockCountLabel.TextSize = 11
 blockCountLabel.Font = Enum.Font.Gotham
 blockCountLabel.TextXAlignment = Enum.TextXAlignment.Left
 blockCountLabel.Parent = statusContainer
@@ -205,8 +224,8 @@ blockCountLabel.Parent = statusContainer
 -- Button Container
 local buttonContainer = Instance.new("Frame")
 buttonContainer.Name = "ButtonContainer"
-buttonContainer.Size = UDim2.new(1, -20, 0, 100)
-buttonContainer.Position = UDim2.new(0, 10, 0, 165)
+buttonContainer.Size = UDim2.new(1, -20, 0, 150)
+buttonContainer.Position = UDim2.new(0, 10, 0, 185)
 buttonContainer.BackgroundTransparency = 1
 buttonContainer.BorderSizePixel = 0
 buttonContainer.Parent = contentFrame
@@ -214,11 +233,11 @@ buttonContainer.Parent = contentFrame
 -- Flight Button
 local flightButton = Instance.new("TextButton")
 flightButton.Name = "FlightButton"
-flightButton.Size = UDim2.new(0.5, -5, 0, 45)
+flightButton.Size = UDim2.new(0.5, -5, 0, 40)
 flightButton.Position = UDim2.new(0, 0, 0, 0)
 flightButton.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
 flightButton.BorderSizePixel = 0
-flightButton.Text = "🚁 FLIGHT\n[E]"
+flightButton.Text = "🚁 FLIGHT [E]"
 flightButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 flightButton.TextSize = 11
 flightButton.Font = Enum.Font.GothamBold
@@ -230,11 +249,11 @@ flightButtonCorner.Parent = flightButton
 -- No Clip Button
 local noclipButton = Instance.new("TextButton")
 noclipButton.Name = "NoclipButton"
-noclipButton.Size = UDim2.new(0.5, -5, 0, 45)
+noclipButton.Size = UDim2.new(0.5, -5, 0, 40)
 noclipButton.Position = UDim2.new(0.5, 5, 0, 0)
 noclipButton.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
 noclipButton.BorderSizePixel = 0
-noclipButton.Text = "👻 NO CLIP\n[X]"
+noclipButton.Text = "👻 NO CLIP [X]"
 noclipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 noclipButton.TextSize = 11
 noclipButton.Font = Enum.Font.GothamBold
@@ -246,18 +265,50 @@ noclipButtonCorner.Parent = noclipButton
 -- Collect Blocks Button
 local collectButton = Instance.new("TextButton")
 collectButton.Name = "CollectButton"
-collectButton.Size = UDim2.new(1, 0, 0, 45)
-collectButton.Position = UDim2.new(0, 0, 0, 50)
+collectButton.Size = UDim2.new(1, 0, 0, 40)
+collectButton.Position = UDim2.new(0, 0, 0, 45)
 collectButton.BackgroundColor3 = Color3.fromRGB(50, 180, 100)
 collectButton.BorderSizePixel = 0
 collectButton.Text = "📦 COLLECT BLOCKS [C]"
 collectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-collectButton.TextSize = 12
+collectButton.TextSize = 11
 collectButton.Font = Enum.Font.GothamBold
 collectButton.Parent = buttonContainer
 local collectButtonCorner = Instance.new("UICorner")
 collectButtonCorner.CornerRadius = UDim.new(0, 8)
 collectButtonCorner.Parent = collectButton
+
+-- Boost Button
+local boostButton = Instance.new("TextButton")
+boostButton.Name = "BoostButton"
+boostButton.Size = UDim2.new(0.5, -5, 0, 40)
+boostButton.Position = UDim2.new(0, 0, 0, 90)
+boostButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+boostButton.BorderSizePixel = 0
+boostButton.Text = "🔥 BOOST [F]"
+boostButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+boostButton.TextSize = 11
+boostButton.Font = Enum.Font.GothamBold
+boostButton.Parent = buttonContainer
+local boostButtonCorner = Instance.new("UICorner")
+boostButtonCorner.CornerRadius = UDim.new(0, 8)
+boostButtonCorner.Parent = boostButton
+
+-- Reset Position Button
+local resetButton = Instance.new("TextButton")
+resetButton.Name = "ResetButton"
+resetButton.Size = UDim2.new(0.5, -5, 0, 40)
+resetButton.Position = UDim2.new(0.5, 5, 0, 90)
+resetButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+resetButton.BorderSizePixel = 0
+resetButton.Text = "🏠 RESET [R]"
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.TextSize = 11
+resetButton.Font = Enum.Font.GothamBold
+resetButton.Parent = buttonContainer
+local resetButtonCorner = Instance.new("UICorner")
+resetButtonCorner.CornerRadius = UDim.new(0, 8)
+resetButtonCorner.Parent = resetButton
 
 -- Make slider draggable
 local dragging = false
@@ -292,6 +343,22 @@ RunService.RenderStepped:Connect(function()
         speedValueLabel.Text = flySpeed .. " km/h"
     end
 end)
+
+-- Function to create speed trail particles
+local function createSpeedTrail()
+    local part = Instance.new("Part")
+    part.Shape = Enum.PartType.Ball
+    part.Size = Vector3.new(0.3, 0.3, 0.3)
+    part.BrickColor = BrickColor.new("Cyan")
+    part.CanCollide = false
+    part.CFrame = humanoidRootPart.CFrame + humanoidRootPart.CFrame.LookVector * 5
+    part.TopSurface = Enum.SurfaceType.Smooth
+    part.BottomSurface = Enum.SurfaceType.Smooth
+    part.Parent = workspace
+    
+    table.insert(particles, part)
+    game:GetService("Debris"):AddItem(part, 0.5)
+end
 
 -- Function to start flying
 local function startFlying()
@@ -350,7 +417,16 @@ local function startFlying()
         if moveDirection.Magnitude > 0 then
             moveDirection = moveDirection.Unit
         end
-        bodyVelocity.Velocity = moveDirection * flySpeed
+        
+        local currentSpeed = flySpeed
+        if isBoostActive then
+            currentSpeed = flySpeed * 2
+            if math.random() > 0.7 then
+                createSpeedTrail()
+            end
+        end
+        
+        bodyVelocity.Velocity = moveDirection * currentSpeed
         
         -- Update rotation
         bodyGyro.CFrame = camera.CFrame
@@ -420,6 +496,26 @@ local function stopNoclip()
     noclipButton.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
 end
 
+-- Function to toggle boost
+local function toggleBoost()
+    isBoostActive = not isBoostActive
+    if isBoostActive then
+        boostStatusLabel.Text = "🔥 Boost: ON"
+        boostStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 0)
+        boostButton.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+    else
+        boostStatusLabel.Text = "🔥 Boost: OFF"
+        boostStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        boostButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    end
+end
+
+-- Function to reset position to spawn
+local function resetPosition()
+    humanoidRootPart.CFrame = CFrame.new(spawnPosition)
+    print("Position reset to spawn!")
+end
+
 -- Function to collect all unanchored blocks
 local function collectBlocks()
     local blocksCollected = 0
@@ -482,6 +578,14 @@ collectButton.MouseButton1Click:Connect(function()
     collectBlocks()
 end)
 
+boostButton.MouseButton1Click:Connect(function()
+    toggleBoost()
+end)
+
+resetButton.MouseButton1Click:Connect(function()
+    resetPosition()
+end)
+
 -- Listen for key presses
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -505,12 +609,21 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.C then
         collectBlocks()
     end
+    
+    if input.KeyCode == Enum.KeyCode.F then
+        toggleBoost()
+    end
+    
+    if input.KeyCode == Enum.KeyCode.R then
+        resetPosition()
+    end
 end)
 
 -- Handle character respawn
 player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    spawnPosition = humanoidRootPart.Position
     if isFlying then
         stopFlying()
     end
@@ -519,7 +632,9 @@ player.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
-print("Flight script with improved UI loaded!")
+print("Flight script v2 with cool features loaded!")
 print("Press E to toggle flight")
 print("Press X to toggle no clip")
 print("Press C to collect all unanchored blocks")
+print("Press F to toggle speed boost (2x speed + particles)")
+print("Press R to reset your position to spawn")
