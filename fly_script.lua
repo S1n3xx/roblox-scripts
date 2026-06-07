@@ -1,5 +1,6 @@
--- Flight Script with UI for Roblox
+-- Flight Script with UI and No Clip for Roblox
 -- Press E to toggle flight mode
+-- Press X to toggle no clip mode
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -10,9 +11,11 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
 local isFlying = false
+local isNoclip = false
 local flySpeed = 50
 local bodyVelocity
 local bodyGyro
+local noclipConnection
 
 -- Create UI
 local screenGui = Instance.new("ScreenGui")
@@ -23,7 +26,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 -- Main Frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 250, 0, 150)
+mainFrame.Size = UDim2.new(0, 250, 0, 200)
 mainFrame.Position = UDim2.new(0, 20, 0, 20)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -72,19 +75,33 @@ sliderButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 sliderButton.BorderSizePixel = 0
 sliderButton.Parent = slider
 
--- Status Label
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Name = "StatusLabel"
-statusLabel.Size = UDim2.new(1, -20, 0, 20)
-statusLabel.Position = UDim2.new(0, 10, 0, 95)
-statusLabel.BackgroundTransparency = 1
-statusLabel.BorderSizePixel = 0
-statusLabel.Text = "Status: OFF (Press E)"
-statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-statusLabel.TextSize = 12
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = mainFrame
+-- Flight Status Label
+local flightStatusLabel = Instance.new("TextLabel")
+flightStatusLabel.Name = "FlightStatusLabel"
+flightStatusLabel.Size = UDim2.new(1, -20, 0, 20)
+flightStatusLabel.Position = UDim2.new(0, 10, 0, 100)
+flightStatusLabel.BackgroundTransparency = 1
+flightStatusLabel.BorderSizePixel = 0
+flightStatusLabel.Text = "Flight: OFF (Press E)"
+flightStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+flightStatusLabel.TextSize = 12
+flightStatusLabel.Font = Enum.Font.Gotham
+flightStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+flightStatusLabel.Parent = mainFrame
+
+-- No Clip Status Label
+local noclipStatusLabel = Instance.new("TextLabel")
+noclipStatusLabel.Name = "NoclipStatusLabel"
+noclipStatusLabel.Size = UDim2.new(1, -20, 0, 20)
+noclipStatusLabel.Position = UDim2.new(0, 10, 0, 125)
+noclipStatusLabel.BackgroundTransparency = 1
+noclipStatusLabel.BorderSizePixel = 0
+noclipStatusLabel.Text = "No Clip: OFF (Press X)"
+noclipStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+noclipStatusLabel.TextSize = 12
+noclipStatusLabel.Font = Enum.Font.Gotham
+noclipStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+noclipStatusLabel.Parent = mainFrame
 
 -- Make slider draggable
 local dragging = false
@@ -137,8 +154,8 @@ local function startFlying()
     bodyGyro.CFrame = humanoidRootPart.CFrame
     bodyGyro.Parent = humanoidRootPart
     
-    statusLabel.Text = "Status: ON"
-    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    flightStatusLabel.Text = "Flight: ON"
+    flightStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
     
     -- Handle flight movement
     local connection
@@ -196,11 +213,53 @@ local function stopFlying()
         bodyGyro = nil
     end
     
-    statusLabel.Text = "Status: OFF (Press E)"
-    statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    flightStatusLabel.Text = "Flight: OFF (Press E)"
+    flightStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 end
 
--- Listen for E key press
+-- Function to start no clip
+local function startNoclip()
+    if isNoclip then return end
+    isNoclip = true
+    
+    noclipStatusLabel.Text = "No Clip: ON"
+    noclipStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    
+    noclipConnection = RunService.RenderStepped:Connect(function()
+        if not isNoclip or not character.Parent then
+            noclipConnection:Disconnect()
+            return
+        end
+        
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+-- Function to stop no clip
+local function stopNoclip()
+    if not isNoclip then return end
+    isNoclip = false
+    
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+    
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = true
+        end
+    end
+    
+    noclipStatusLabel.Text = "No Clip: OFF (Press X)"
+    noclipStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+end
+
+-- Listen for E key press (Flight toggle)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
@@ -209,6 +268,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             stopFlying()
         else
             startFlying()
+        end
+    end
+    
+    if input.KeyCode == Enum.KeyCode.X then
+        if isNoclip then
+            stopNoclip()
+        else
+            startNoclip()
         end
     end
 end)
@@ -220,8 +287,12 @@ player.CharacterAdded:Connect(function(newCharacter)
     if isFlying then
         stopFlying()
     end
+    if isNoclip then
+        stopNoclip()
+    end
 end)
 
-print("Flight script with UI loaded!")
+print("Flight script with UI and No Clip loaded!")
 print("Press E to toggle flight")
-print("Drag the slider to adjust speed (1-200)")
+print("Press X to toggle no clip")
+print("Drag the slider to adjust flight speed (1-200)")
