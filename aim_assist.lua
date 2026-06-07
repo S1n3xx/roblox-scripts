@@ -60,7 +60,7 @@ title.Name = "Title"
 title.Size = UDim2.new(1, 0, 1, 0)
 title.BackgroundTransparency = 1
 title.BorderSizePixel = 0
-title.Text = "🎯 AIM ASSIST v4"
+title.Text = "🎯 AIM ASSIST v5"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 18
 title.Font = Enum.Font.GothamBold
@@ -115,7 +115,7 @@ targetLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
 targetLabel.TextSize = 11
 targetLabel.Font = Enum.Font.Gotham
 targetLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = contentFrame
+targetLabel.Parent = contentFrame
 
 -- Sensitivity Label
 local sensitivityLabel = Instance.new("TextLabel")
@@ -436,6 +436,10 @@ crosshairRight.ZIndex = 101
 
 -- Main aim assist loop
 RunService.RenderStepped:Connect(function()
+    if not aimAssistEnabled then
+        return
+    end
+    
     local screenSize = camera.ViewportSize
     local screenCenter = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
     
@@ -448,58 +452,47 @@ RunService.RenderStepped:Connect(function()
         aimRadiusCircle.Visible = false
     end
     
-    if aimAssistEnabled then
-        targetPlayer = findClosestEnemy()
+    targetPlayer = findClosestEnemy()
+    
+    if targetPlayer and targetPlayer.Character then
+        targetPart = getBestTargetPart(targetPlayer.Character)
         
-        if targetPlayer and targetPlayer.Character then
-            targetPart = getBestTargetPart(targetPlayer.Character)
+        if targetPart then
+            local targetPosition = targetPart.Position
+            local screenPosition = camera:WorldToScreenPoint(targetPosition)
             
-            if targetPart then
-                local targetPosition = targetPart.Position
-                local screenPosition = camera:WorldToScreenPoint(targetPosition)
+            if visualsEnabled then
+                targetCircle.Visible = true
+                targetCircle.Position = UDim2.new(0, screenPosition.X - 20, 0, screenPosition.Y - 20)
                 
-                if visualsEnabled then
-                    targetCircle.Visible = true
-                    targetCircle.Position = UDim2.new(0, screenPosition.X - 20, 0, screenPosition.Y - 20)
-                    
-                    local lineLength = 30
-                    
-                    crosshairTop.Visible = true
-                    crosshairTop.Size = UDim2.new(0, 2, 0, lineLength)
-                    crosshairTop.Position = UDim2.new(0, screenPosition.X - 1, 0, screenPosition.Y - lineLength)
-                    
-                    crosshairBottom.Visible = true
-                    crosshairBottom.Size = UDim2.new(0, 2, 0, lineLength)
-                    crosshairBottom.Position = UDim2.new(0, screenPosition.X - 1, 0, screenPosition.Y + 20)
-                    
-                    crosshairLeft.Visible = true
-                    crosshairLeft.Size = UDim2.new(0, lineLength, 0, 2)
-                    crosshairLeft.Position = UDim2.new(0, screenPosition.X - lineLength, 0, screenPosition.Y - 1)
-                    
-                    crosshairRight.Visible = true
-                    crosshairRight.Size = UDim2.new(0, lineLength, 0, 2)
-                    crosshairRight.Position = UDim2.new(0, screenPosition.X + 20, 0, screenPosition.Y - 1)
-                end
+                local lineLength = 30
                 
-                local targetCFrame = CFrame.new(camera.CFrame.Position, targetPosition)
-                camera.CFrame = camera.CFrame:Lerp(targetCFrame, aimSensitivity * 0.1)
+                crosshairTop.Visible = true
+                crosshairTop.Size = UDim2.new(0, 2, 0, lineLength)
+                crosshairTop.Position = UDim2.new(0, screenPosition.X - 1, 0, screenPosition.Y - lineLength)
                 
-                targetLabel.Text = "Target: " .. targetPlayer.Name
-                targetLabel.TextColor3 = Color3.fromRGB(0, 200, 100)
-            else
-                targetLabel.Text = "Target: None"
-                targetLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
-                if visualsEnabled then
-                    targetCircle.Visible = false
-                    crosshairTop.Visible = false
-                    crosshairBottom.Visible = false
-                    crosshairLeft.Visible = false
-                    crosshairRight.Visible = false
-                end
+                crosshairBottom.Visible = true
+                crosshairBottom.Size = UDim2.new(0, 2, 0, lineLength)
+                crosshairBottom.Position = UDim2.new(0, screenPosition.X - 1, 0, screenPosition.Y + 20)
+                
+                crosshairLeft.Visible = true
+                crosshairLeft.Size = UDim2.new(0, lineLength, 0, 2)
+                crosshairLeft.Position = UDim2.new(0, screenPosition.X - lineLength, 0, screenPosition.Y - 1)
+                
+                crosshairRight.Visible = true
+                crosshairRight.Size = UDim2.new(0, lineLength, 0, 2)
+                crosshairRight.Position = UDim2.new(0, screenPosition.X + 20, 0, screenPosition.Y - 1)
             end
+            
+            -- APPLY AIM ASSIST - DIRECTLY MOVE CAMERA
+            local targetCFrame = CFrame.new(camera.CFrame.Position, targetPosition)
+            camera.CFrame = camera.CFrame:Lerp(targetCFrame, aimSensitivity * 0.2)
+            
+            targetLabel.Text = "🎯 Target: " .. targetPlayer.Name
+            targetLabel.TextColor3 = Color3.fromRGB(0, 200, 100)
         else
-            targetLabel.Text = "Target: None"
-            targetLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+            targetLabel.Text = "⭕ Target: In Radius"
+            targetLabel.TextColor3 = Color3.fromRGB(200, 200, 0)
             if visualsEnabled then
                 targetCircle.Visible = false
                 crosshairTop.Visible = false
@@ -509,6 +502,8 @@ RunService.RenderStepped:Connect(function()
             end
         end
     else
+        targetLabel.Text = "❌ Target: None"
+        targetLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         if visualsEnabled then
             targetCircle.Visible = false
             crosshairTop.Visible = false
@@ -536,6 +531,7 @@ local function toggleAimAssist()
         crosshairBottom.Visible = false
         crosshairLeft.Visible = false
         crosshairRight.Visible = false
+        aimRadiusCircle.Visible = false
         print("❌ Aim Assist DISABLED")
     end
 end
@@ -552,7 +548,7 @@ local function toggleTeamCheck()
         teamCheckLabel.Text = "🛡️ Team Check: OFF"
         teamCheckLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         teamCheckButton.BackgroundColor3 = Color3.fromRGB(150, 100, 50)
-        print("❌ Team Check DISABLED")
+        print("❌ Team Check DISABLED - Will aim at EVERYONE")
     end
 end
 
@@ -616,7 +612,9 @@ mouse.WheelMoved:Connect(function(direction)
     end
 end)
 
-print("🎯 Advanced Aim Assist Script v4 LOADED!")
+print("🎯 Advanced Aim Assist Script v5 LOADED!")
 print("Press T to toggle aim assist")
 print("Press V to toggle team check")
 print("Press Y to toggle visuals")
+print("Scroll to change sensitivity")
+print("Hold U + Scroll to change aim radius")
