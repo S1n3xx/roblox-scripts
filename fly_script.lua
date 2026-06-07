@@ -17,6 +17,7 @@ local flySpeed = 50
 local bodyVelocity
 local bodyGyro
 local noclipConnection
+local collectedParts = {}
 
 -- Create UI
 local screenGui = Instance.new("ScreenGui")
@@ -290,30 +291,41 @@ end
 -- Function to collect all unanchored blocks
 local function collectBlocks()
     local blocksCollected = 0
+    collectedParts = {}
     
+    -- Find all unanchored parts in workspace
     for _, part in pairs(workspace:GetDescendants()) do
-        if part:IsA("BasePart") and not part.Anchored and part.Parent ~= character then
-            -- Create attachment points if they don't exist
-            if not part:FindFirstChild("BodyVelocity") then
-                local bodyVel = Instance.new("BodyVelocity")
-                bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bodyVel.P = 10000
-                bodyVel.Parent = part
-                
-                -- Move the part to the player
-                local direction = (humanoidRootPart.Position - part.Position).Unit
-                bodyVel.Velocity = direction * 100
-                
-                -- Remove the velocity after a short time to let it settle
-                game:GetService("Debris"):AddItem(bodyVel, 1)
-                
-                blocksCollected = blocksCollected + 1
-            end
+        if part:IsA("BasePart") and not part.Anchored and part.Parent ~= character and not part.Parent:FindFirstChild("Humanoid") then
+            table.insert(collectedParts, part)
         end
     end
     
+    blocksCollected = #collectedParts
     blockCountLabel.Text = "Blocks: " .. blocksCollected
-    print("Collected " .. blocksCollected .. " blocks!")
+    
+    -- Move blocks to player continuously
+    local moveConnection
+    moveConnection = RunService.RenderStepped:Connect(function()
+        local partsToKeep = {}
+        
+        for _, part in pairs(collectedParts) do
+            if part and part.Parent then
+                local direction = (humanoidRootPart.Position - part.Position)
+                if direction.Magnitude > 5 then
+                    part.Velocity = direction.Unit * 50
+                    table.insert(partsToKeep, part)
+                end
+            end
+        end
+        
+        collectedParts = partsToKeep
+        
+        if #collectedParts == 0 then
+            moveConnection:Disconnect()
+        end
+    end)
+    
+    print("Collecting " .. blocksCollected .. " blocks!")
 end
 
 -- Button click handler
